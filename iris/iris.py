@@ -37,7 +37,7 @@ if __name__ == '__main__':
     for i in range(len(Y_test)):
         Y_test_one_label.append(np.where(Y_test[i] == 1)[0][0])
 
-    precision = precision_score(Y_test_one_label, predictions, average='macro')
-    recall = recall_score(Y_test_one_label, predictions, average='macro')
-    f1 = f1_score(Y_test_one_label, predictions, average='macro')
+    precision = precision_score(Y_test_one_label, predictions, average=None)
+    recall = recall_score(Y_test_one_label, predictions, average=None)
+    f1 = f1_score(Y_test_one_label, predictions, average=None)
     print("precision:", precision, "recall:", recall, "f1:", f1)
