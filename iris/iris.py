@@ -1,8 +1,4 @@
-import csv
-
-import keras
-import tensorflow as tf
-from tensorflow.python.keras import Model, Sequential
+from tensorflow.python.keras import Sequential
 from tensorflow.python.keras.layers import Dense
 import numpy as np
 import pandas as pd
