@@ -1,3 +1,4 @@
+Time in seconds starting from 0 rounded to the closest 0.025s, Acceleration reading in G for frontal axis, Acceleration reading in G for vertical axis, Acceleration reading in G for lateral axis, Id of antenna reading sensor, Received signal strength indicator (RSSI), Phase, Frequency, Label of activity
 0,0.096148,1.0886,-0.082102,1,-42.5,4.0942,925.25,2
 0.025,0.10787,0.89339,-0.10491,1,-45,4.5759,925.25,2
 1.75,0.20168,0.97377,-0.082102,2,-57,4.3059,923.75,2
