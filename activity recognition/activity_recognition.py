@@ -6,6 +6,7 @@ from tensorflow.python.keras.layers import Dense, Dropout
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import precision_score, recall_score, f1_score
+from random import randint
 from tensorflow.python.keras.utils.np_utils import to_categorical
 
 
@@ -51,6 +52,62 @@ def load_data():
             Y_S2_new.append(j)
 
     return np.array(X_S1_new), np.array(Y_S1_new), np.array(X_S2_new), np.array(Y_S2_new)
+
+
+def load_data_gender():
+    csv_files = glob.glob(os.path.join("Datasets_Healthy_Older_People/S1_Dataset", "*"))
+    csv_files += glob.glob(os.path.join("Datasets_Healthy_Older_People/S2_Dataset", "*"))
+
+    male = []
+    female = []
+
+    for i in csv_files:
+        if 'M' in i:
+            male.append(i)
+        else:
+            female.append(i)
+
+    X_male = []
+    Y_male = []
+
+    for i in male:
+        data_tmp = pd.read_csv(i)
+        X_tmp = data_tmp.iloc[:, 0:8].values
+        Y_tmp = data_tmp.iloc[:, 8].values
+        X_male.append(X_tmp)
+        Y_male.append(Y_tmp)
+
+    X_female = []
+    Y_female = []
+
+    for i in female:
+        data_tmp = pd.read_csv(i)
+        X_tmp = data_tmp.iloc[:, 0:8].values
+        Y_tmp = data_tmp.iloc[:, 8].values
+        X_female.append(X_tmp)
+        Y_female.append(Y_tmp)
+
+    X_male_new = []
+    for i in X_male:
+        for j in i:
+            X_male_new.append(j)
+
+    X_female_new = []
+    for i in X_female:
+        for j in i:
+            X_female_new.append(j)
+
+    Y_male_new = []
+    for i in Y_male:
+        for j in i:
+            Y_male_new.append(j)
+
+    Y_female_new = []
+    for i in Y_female:
+        for j in i:
+            Y_female_new.append(j)
+
+    return np.array(X_male_new), np.array(Y_male_new), np.array(X_female_new), np.array(Y_female_new)
 
 
 def majority_class_classifier(Y_train, Y_test):
@@ -102,37 +159,75 @@ def neural_network_classifier(X_train, X_test, Y_train, Y_test, X_val, Y_val):
     return precision, recall, f1
 
 
-if __name__ == "__main__":
+def classify_by_gender():
+
+    print("----------------------Gender----------------------")
+
+    X_male, Y_male, X_female, Y_female = load_data_gender()
+
+    X_male_train, X_male_test, Y_male_train, Y_male_test = train_test_split(X_male, Y_male, test_size=0.2)
+    X_female_train, X_female_test, Y_female_train, Y_female_test = train_test_split(X_female, Y_female, test_size=0.2)
+
+    precision_male_maj, recall_male_maj, f1_male_maj = majority_class_classifier(Y_male_train, Y_male_test)
+    precision_female_maj, recall_female_maj, f1_female_maj = majority_class_classifier(Y_female_train, Y_female_test)
+
+    precision_male_rand, recall_male_rand, f1_male_rand = simple_baseline_classifier(Y_male_test)
+    precision_female_rand, recall_female_rand, f1_female_rand = simple_baseline_classifier(Y_female_test)
+
+    Y_male_encoded = to_categorical(Y_male)
+    Y_female_encoded = to_categorical(Y_female)
+
+    X_male_train, X_male_test, Y_male_train, Y_male_test = train_test_split(X_male, Y_male_encoded, test_size=0.2)
+    X_female_train, X_female_test, Y_female_train, Y_female_test = train_test_split(X_female, Y_female_encoded, test_size=0.2)
+
+    X_male_train, X_male_val, Y_male_train, Y_male_val = train_test_split(X_male_train, Y_male_train, test_size=0.2)
+    X_female_train, X_female_val, Y_female_train, Y_female_val = train_test_split(X_female_train, Y_female_train, test_size=0.2)
+
+    precision_male, recall_male, f1_male = neural_network_classifier(
+        X_male_train, X_male_test, Y_male_train, Y_male_test, X_male_val, Y_male_val
+    )
+    precision_female, recall_female, f1_female = neural_network_classifier(
+        X_female_train, X_female_test, Y_female_train, Y_female_test, X_female_val, Y_female_val
+    )
+
+    print("                      Majority Class Classifier")
+    print("                                Male")
+    print("precision male:", precision_male_maj, "recall male:", recall_male_maj, "f1 male:", f1_male_maj)
+    print("                               Female")
+    print("precision female:", precision_female_maj, "recall female:", recall_female_maj, "f1 female:", f1_female_maj)
+    print("")
+
+    print("                        Random Class Classifier")
+    print("                                Male")
+    print("precision male:", precision_male_rand, "recall male:", recall_male_rand, "f1 male:", f1_male_rand)
+    print("                               Female")
+    print("precision female:", precision_female_rand, "recall female:", recall_female_rand, "f1 female:", f1_female_rand)
+    print("")
+
+    print("               3-Layer Densely Connected Neural Network")
+    print("                                Male")
+    print("precision male:", precision_male, "recall male:", recall_male, "f1 male:", f1_male)
+    print("                                Female")
+    print("precision female:", precision_female, "recall female:", recall_female, "f1 female:", f1_female)
+
+    print("----------------------Gender----------------------")
+
+
+def classify_by_room():
+    print("----------------------Room-----------------------")
     X_S1, Y_S1, X_S2, Y_S2 = load_data()
 
-    # X_S1_train, X_S1_test, Y_S1_train, Y_S1_test = train_test_split(X_S1, Y_S1, test_size=0.2)
-    # X_S2_train, X_S2_test, Y_S2_train, Y_S2_test = train_test_split(X_S2, Y_S2, test_size=0.2)
-    #
-    # majority_precision_S1, majority_recall_S1, majority_f1_S1 = majority_class_classifier(Y_S1_train, Y_S1_test)
-    # majority_precision_S2, majority_recall_S2, majority_f1_S2 = majority_class_classifier(Y_S1_train, Y_S1_test)
+    X_S1_train, X_S1_test, Y_S1_train, Y_S1_test = train_test_split(X_S1, Y_S1, test_size=0.2)
+    X_S2_train, X_S2_test, Y_S2_train, Y_S2_test = train_test_split(X_S2, Y_S2, test_size=0.2)
 
-    # print("Majority Class Classifier")
-    # print("          S1")
-    # print("precision:", majority_precision_S1, "\nrecall:", majority_recall_S1, "\nf1 S1:", majority_f1_S1)
-    # print("          S2")
-    # print("precision:", majority_precision_S2, "\nrecall:", majority_recall_S2, "\nf1:", majority_f1_S2)
-    #
-    # print("")
-    #
-    # random_precision_S1, random_recall_S1, random_f1_S1 = simple_baseline_classifier(Y_S1_test)
-    # random_precision_S2, random_recall_S2, random_f1_S2 = simple_baseline_classifier(Y_S2_test)
-    #
-    # print("Random Class Classifier")
-    # print("          S1")
-    # print("precision:", random_precision_S1, "\nrecall:", random_recall_S1, "\nf1:", random_f1_S1)
-    # print("          S2")
-    # print("precision:", random_precision_S2, "\nrecall:", random_recall_S2, "\nf1:", random_f1_S2)
+    precision_S1_maj, recall_S1_maj, f1_S1_maj = majority_class_classifier(Y_S1_train, Y_S1_test)
+    precision_S2_maj, recall_S2_maj, f1_S2_maj = majority_class_classifier(Y_S1_train, Y_S1_test)
 
-    X = np.concatenate((X_S1, X_S2))
-    Y = np.concatenate((Y_S1, Y_S2))
+    precision_S1_rand, recall_S1_rand, f1_S1_rand = simple_baseline_classifier(Y_S1_test)
+    precision_S2_rand, recall_S2_rand, f1_S2_rand = simple_baseline_classifier(Y_S2_test)
+
     Y_S1_encoded = to_categorical(Y_S1)
     Y_S2_encoded = to_categorical(Y_S2)
-    Y_encoded = to_categorical(Y)
 
     X_S1_train, X_S1_test, Y_S1_train, Y_S1_test = train_test_split(X_S1, Y_S1_encoded, test_size=0.2)
     X_S1_train, X_S1_val, Y_S1_train, Y_S1_val = train_test_split(X_S1_train, Y_S1_train, test_size=0.2)
@@ -140,24 +235,72 @@ if __name__ == "__main__":
     X_S2_train, X_S2_test, Y_S2_train, Y_S2_test = train_test_split(X_S2, Y_S2_encoded, test_size=0.2)
     X_S2_train, X_S2_val, Y_S2_train, Y_S2_val = train_test_split(X_S2_train, Y_S2_train, test_size=0.2)
 
+    precision_S1_nn, recall_S1_nn, f1_S1_nn = neural_network_classifier(
+        X_S1_train, X_S1_test, Y_S1_train, Y_S1_test, X_S1_val, Y_S1_val
+    )
+    precision_S2_nn, recall_S2_nn, f1_S2_nn = neural_network_classifier(
+        X_S2_train, X_S2_test, Y_S2_train, Y_S2_test, X_S2_val, Y_S2_val
+    )
+
+    print("                      Majority Class Classifier")
+    print("                                S1")
+    print("precision:", precision_S1_maj, "recall:", recall_S1_maj, "f1 S1:", f1_S1_maj)
+    print("                                S2")
+    print("precision:", precision_S2_maj, "recall:", recall_S2_maj, "f1:", f1_S2_maj)
+    print("")
+
+    print("                        Random Class Classifier")
+    print("                                S1")
+    print("precision:", precision_S1_rand, "recall:", recall_S1_rand, "f1:", f1_S1_rand)
+    print("                                S2")
+    print("precision:", precision_S2_rand, "recall:", recall_S2_rand, "f1:", f1_S2_rand)
+    print("")
+
+    print("               3-Layer Densely Connected Neural Network")
+    print("                                S1")
+    print("precision:", precision_S1_nn, "recall:", recall_S1_nn, "f1:", f1_S1_nn)
+    print("                                S2")
+    print("precision:", precision_S2_nn, "recall:", recall_S2_nn, "f1:", f1_S2_nn)
+
+    print("----------------------Room-----------------------")
+
+
+def classify_as_one():
+    print("----------------------Both----------------------")
+    X_S1, Y_S1, X_S2, Y_S2 = load_data()
+    X = np.concatenate((X_S1, X_S2))
+    Y = np.concatenate((Y_S1, Y_S2))
+    Y_encoded = to_categorical(Y)
+
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2)
+
+    precision_maj, recall_maj, f1_maj = majority_class_classifier(Y_train, Y_test)
+
+    precision_rand, recall_rand, f1_rand = simple_baseline_classifier(Y_test)
+
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y_encoded, test_size=0.2)
     X_train, X_val, Y_train, Y_val = train_test_split(X_train, Y_train, test_size=0.2)
 
-    nn_precision_S1, nn_recall_S1, nn_f1_S1 = neural_network_classifier(
-        X_S1_train, X_S1_test, Y_S1_train, Y_S1_test, X_S1_val, Y_S1_val
-    )
-    nn_precision_S2, nn_recall_S2, nn_f1_S2 = neural_network_classifier(
-        X_S2_train, X_S2_test, Y_S2_train, Y_S2_test, X_S2_val, Y_S2_val
-    )
-    nn_precision_both, nn_recall_both, nn_f1_both = neural_network_classifier(
+    nn_precision, nn_recall, nn_f1 = neural_network_classifier(
         X_train, X_test, Y_train, Y_test, X_val, Y_val
+
     )
 
-    print("3-Layer Densely Connected Neural Network")
-    print("                                S1")
-    print("precision:", nn_precision_S1, "recall:", nn_recall_S1, "f1:", nn_f1_S1)
-    print("                                S2")
-    print("precision:", nn_precision_S2, "recall:", nn_recall_S2, "f1:", nn_f1_S2)
-    print("                                Both")
-    print("precision:", nn_precision_both, "recall:", nn_recall_both, "f1:", nn_f1_both)
+    print("                      Majority Class Classifier")
+    print("precision:", precision_maj, "recall:", recall_maj, "f1:", f1_maj)
+    print("")
 
+    print("                        Random Class Classifier")
+    print("precision:", precision_rand, "recall:", recall_rand, "f1:", f1_rand)
+    print("")
+
+    print("               3-Layer Densely Connected Neural Network")
+    print("precision:", nn_precision, "recall:", nn_recall, "f1:", nn_f1)
+
+    print("----------------------Both----------------------")
+
+
+if __name__ == "__main__":
+    # classify_by_gender()
+    # classify_by_room()
+    classify_as_one()
