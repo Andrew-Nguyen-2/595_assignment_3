@@ -40,4 +40,5 @@ if __name__ == '__main__':
     precision = precision_score(Y_test_one_label, predictions, average="macro")
     recall = recall_score(Y_test_one_label, predictions, average="macro")
     f1 = f1_score(Y_test_one_label, predictions, average="macro")
+    print("")
     print("precision:", precision, "recall:", recall, "f1:", f1)

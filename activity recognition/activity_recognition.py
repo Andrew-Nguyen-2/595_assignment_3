@@ -6,8 +6,10 @@ from tensorflow.python.keras.layers import Dense, Dropout
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import precision_score, recall_score, f1_score
-from random import randint
 from tensorflow.python.keras.utils.np_utils import to_categorical
+
+
+evaluation_metric = "micro"
 
 
 def load_data():
@@ -116,9 +118,9 @@ def majority_class_classifier(Y_train, Y_test):
 
     Y_prediction = np.clip(Y_test, majority_class, majority_class)
 
-    precision = precision_score(Y_test, Y_prediction, average="macro", zero_division=1)
-    recall = recall_score(Y_test, Y_prediction, average="macro", zero_division=1)
-    f1 = f1_score(Y_test, Y_prediction, average="macro", zero_division=1)
+    precision = precision_score(Y_test, Y_prediction, average=evaluation_metric, zero_division=1)
+    recall = recall_score(Y_test, Y_prediction, average=evaluation_metric, zero_division=1)
+    f1 = f1_score(Y_test, Y_prediction, average=evaluation_metric, zero_division=1)
 
     return precision, recall, f1
 
@@ -126,9 +128,9 @@ def majority_class_classifier(Y_train, Y_test):
 def simple_baseline_classifier(Y_test):
     Y_prediction = np.random.randint(1, 5, size=(np.shape(Y_test)))
 
-    precision = precision_score(Y_test, Y_prediction, average="macro", zero_division=1)
-    recall = recall_score(Y_test, Y_prediction, average="macro", zero_division=1)
-    f1 = f1_score(Y_test, Y_prediction, average="macro", zero_division=1)
+    precision = precision_score(Y_test, Y_prediction, average=evaluation_metric, zero_division=1)
+    recall = recall_score(Y_test, Y_prediction, average=evaluation_metric, zero_division=1)
+    f1 = f1_score(Y_test, Y_prediction, average=evaluation_metric, zero_division=1)
 
     return precision, recall, f1
 
@@ -152,9 +154,9 @@ def neural_network_classifier(X_train, X_test, Y_train, Y_test, X_val, Y_val):
     for i in range(len(Y_test)):
         Y_test_one_label.append(np.where(Y_test[i] == 1)[0][0])
 
-    precision = precision_score(Y_test_one_label, predictions, average="macro", zero_division=1)
-    recall = recall_score(Y_test_one_label, predictions, average="macro", zero_division=1)
-    f1 = f1_score(Y_test_one_label, predictions, average="macro", zero_division=1)
+    precision = precision_score(Y_test_one_label, predictions, average=evaluation_metric, zero_division=1)
+    recall = recall_score(Y_test_one_label, predictions, average=evaluation_metric, zero_division=1)
+    f1 = f1_score(Y_test_one_label, predictions, average=evaluation_metric, zero_division=1)
 
     return precision, recall, f1
 
@@ -301,6 +303,7 @@ def classify_as_one():
 
 
 if __name__ == "__main__":
-    # classify_by_gender()
+    classify_by_gender()
     # classify_by_room()
-    classify_as_one()
+    # classify_as_one()
+
