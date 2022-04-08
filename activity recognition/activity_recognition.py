@@ -7,9 +7,11 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import precision_score, recall_score, f1_score
 from tensorflow.python.keras.utils.np_utils import to_categorical
+from imblearn.over_sampling import SMOTE
 
-
-evaluation_metric = "micro"
+evaluation_metric = "macro"
+smote = SMOTE(sampling_strategy="minority")
+do_smote = False
 
 
 def load_data():
@@ -176,6 +178,11 @@ def classify_by_gender():
     precision_male_rand, recall_male_rand, f1_male_rand = simple_baseline_classifier(Y_male_test)
     precision_female_rand, recall_female_rand, f1_female_rand = simple_baseline_classifier(Y_female_test)
 
+    # apply smote
+    if do_smote:
+        X_male, Y_male = apply_smote(X_male, Y_male)
+        X_female, Y_female = apply_smote(X_female, Y_female)
+
     Y_male_encoded = to_categorical(Y_male)
     Y_female_encoded = to_categorical(Y_female)
 
@@ -228,6 +235,11 @@ def classify_by_room():
     precision_S1_rand, recall_S1_rand, f1_S1_rand = simple_baseline_classifier(Y_S1_test)
     precision_S2_rand, recall_S2_rand, f1_S2_rand = simple_baseline_classifier(Y_S2_test)
 
+    # apply smote
+    if do_smote:
+        X_S1, Y_S1 = apply_smote(X_S1, Y_S1)
+        X_S2, Y_S2 = apply_smote(X_S2, Y_S2)
+
     Y_S1_encoded = to_categorical(Y_S1)
     Y_S2_encoded = to_categorical(Y_S2)
 
@@ -272,7 +284,6 @@ def classify_as_one():
     X_S1, Y_S1, X_S2, Y_S2 = load_data()
     X = np.concatenate((X_S1, X_S2))
     Y = np.concatenate((Y_S1, Y_S2))
-    Y_encoded = to_categorical(Y)
 
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2)
 
@@ -280,12 +291,17 @@ def classify_as_one():
 
     precision_rand, recall_rand, f1_rand = simple_baseline_classifier(Y_test)
 
+    # apply smote
+    if do_smote:
+        X, Y = apply_smote(X, Y)
+
+    Y_encoded = to_categorical(Y)
+
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y_encoded, test_size=0.2)
     X_train, X_val, Y_train, Y_val = train_test_split(X_train, Y_train, test_size=0.2)
 
     nn_precision, nn_recall, nn_f1 = neural_network_classifier(
         X_train, X_test, Y_train, Y_test, X_val, Y_val
-
     )
 
     print("                      Majority Class Classifier")
@@ -302,8 +318,21 @@ def classify_as_one():
     print("----------------------Both----------------------")
 
 
+def apply_smote(x, y):
+    x_smote, y_smote = smote.fit_resample(x, y)
+
+    return x_smote, y_smote
+
+
 if __name__ == "__main__":
-    classify_by_gender()
+    # classify_by_gender()
     # classify_by_room()
     # classify_as_one()
 
+    X_1, Y_1, X_2, Y_2 = load_data()
+    print("len X1:", len(X_1), "len Y1:", len(Y_1), "Class 1:", np.bincount(Y_1))
+    print("len X2:", len(X_2), "len Y2:", len(Y_2), "Class 2:", np.bincount(Y_2))
+    X_1, Y_1 = apply_smote(X_1, Y_1)
+    X_2, Y_2 = apply_smote(X_2, Y_2)
+    print("len X1:", len(X_1), "len Y1:", len(Y_1), "Class 1:", np.bincount(Y_1))
+    print("len X2:", len(X_2), "len Y2:", len(Y_2), "Class 2:", np.bincount(Y_2))
