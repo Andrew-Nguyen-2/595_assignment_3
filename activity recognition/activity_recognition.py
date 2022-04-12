@@ -1,14 +1,14 @@
-import os.path
-import pandas as pd
 import glob
+import os.path
+import numpy as np
+import pandas as pd
+from imblearn.over_sampling import SMOTE
+from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.model_selection import train_test_split
 from tensorflow.python.keras import Sequential
 from tensorflow.python.keras.layers import Dense, Dropout
 from tensorflow.python.keras.optimizer_v2.adam import Adam
-import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import precision_score, recall_score, f1_score
 from tensorflow.python.keras.utils.np_utils import to_categorical
-from imblearn.over_sampling import SMOTE
 
 evaluation_metric = 'macro'
 smote = SMOTE(sampling_strategy="not majority")
@@ -189,10 +189,35 @@ def simple_baseline_classifier(X_train, X_test, Y_train, Y_test):
     return precision, recall, f1
 
 
+def train_learning_rate(x_train, x_test, y_train, y_test, x_val, y_val):
+    learning_rate = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
+    updated_learning_rates = []
+    learning_rate_out = 0
+    loss = float("inf")
+    f1 = float("-inf")
+    for lr in learning_rate:
+        model = Sequential()
+        model.add(Dense(8, input_shape=(8,), activation='gelu'))
+        model.add(Dropout(0.8))
+        model.add(Dense(6, activation='tanh'))
+        model.add(Dropout(0.8))
+        model.add(Dense(4, activation='softmax'))
+        optimizer = Adam(learning_rate=lr)
+        model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
+        history = model.fit(x_train, y_train, validation_data=(x_val, y_val), epochs=100, batch_size=75000)
+        tmp_loss = min(history.history['loss'])
+        if tmp_loss < loss:
+            loss = tmp_loss
+            learning_rate_out = lr
+            updated_learning_rates.append(lr)
+
+    return learning_rate_out, updated_learning_rates
+
+
 def neural_network_classifier(X_train, X_test, Y_train, Y_test, X_val, Y_val):
     # fixed one hot encoding to only be 0-3
 
-    learning_rate = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
+    learning_rate, all_learning_rates = train_learning_rate(X_train, X_test, Y_train, Y_test, X_val, Y_val)
 
     model = Sequential()
     model.add(Dense(8, input_shape=(8,), activation='gelu'))
@@ -200,10 +225,9 @@ def neural_network_classifier(X_train, X_test, Y_train, Y_test, X_val, Y_val):
     model.add(Dense(6, activation='tanh'))
     model.add(Dropout(0.8))
     model.add(Dense(4, activation='softmax'))
-    optimizer = Adam(lr=1e-3)
-    # model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-    # optimizer = Adam(learning_rate=learning_rate)
+    optimizer = Adam(learning_rate=learning_rate)
     model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
+    # model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
     model.summary()
 
@@ -219,7 +243,7 @@ def neural_network_classifier(X_train, X_test, Y_train, Y_test, X_val, Y_val):
     recall = recall_score(Y_test_one_label, predictions, average=evaluation_metric, zero_division=1)
     f1 = f1_score(Y_test_one_label, predictions, average=evaluation_metric, zero_division=1)
 
-    return precision, recall, f1
+    return precision, recall, f1, learning_rate, all_learning_rates
 
 
 def classify_by_gender():
@@ -363,21 +387,24 @@ def classify_as_one():
 
     precision_maj, recall_maj, f1_maj = majority_class_classifier(Y_train, Y_test)
 
-    precision_rand, recall_rand, f1_rand = simple_baseline_classifier(X_train, X_test, Y_train, Y_test)
+    precision_avg, recall_avg, f1_avg = simple_baseline_classifier(X_train, X_test, Y_train, Y_test)
+
+    # under sample majority class
+    X, Y = under_sample_majority_class(X, Y)
+
+    # over sample minority classes
+    X, Y = over_sample_minority_classes(X, Y)
 
     # apply smote
     if do_smote:
         X, Y = apply_smote(X, Y)
-
-    unique, counts = np.unique(Y, return_counts=True)
-    print("before class count:", np.column_stack((unique, counts)))
 
     Y_encoded = to_categorical(Y)
 
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y_encoded, test_size=0.2)
     X_train, X_val, Y_train, Y_val = train_test_split(X_train, Y_train, test_size=0.2)
 
-    nn_precision, nn_recall, nn_f1 = neural_network_classifier(
+    nn_precision, nn_recall, nn_f1, learning_rate, all_learning_rates = neural_network_classifier(
         X_train, X_test, Y_train, Y_test, X_val, Y_val
     )
 
@@ -386,11 +413,13 @@ def classify_as_one():
     print("")
 
     print("                        Baseline Class Classifier")
-    print("precision:", precision_rand, "recall:", recall_rand, "f1:", f1_rand)
+    print("precision:", precision_avg, "recall:", recall_avg, "f1:", f1_avg)
     print("")
 
     print("                    3-Layer Densely Connected Neural Network")
     print("precision:", nn_precision, "recall:", nn_recall, "f1:", nn_f1)
+    print("")
+    print("optimal learning rate:", learning_rate, "learning rate updates:", all_learning_rates)
 
     print("----------------------Both----------------------")
 
@@ -398,11 +427,8 @@ def classify_as_one():
 def classify_by_activity():
     X_sit, X_lay, X_walk, Y_sit, Y_lay, Y_walk = load_data_activity()
 
-    Y_sit_one_label = np.clip(Y_sit, 1, 1)
-
     X = np.concatenate((X_sit, X_lay, X_walk))
     Y = np.concatenate((Y_sit, Y_lay, Y_walk))
-    # Y = np.concatenate((Y_sit_one_label, Y_lay, Y_walk))
 
     unique, counts = np.unique(Y, return_counts=True)
     print("before class count:", np.column_stack((unique, counts)))
@@ -567,6 +593,6 @@ def under_sample_majority_class(x, y):
 
 if __name__ == "__main__":
     # classify_by_gender()
-    classify_by_room()
-    # classify_as_one()
+    # classify_by_room()
+    classify_as_one()
     # classify_by_activity()
