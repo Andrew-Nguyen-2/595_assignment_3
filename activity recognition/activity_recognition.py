@@ -12,7 +12,7 @@ from imblearn.over_sampling import SMOTE
 
 evaluation_metric = 'macro'
 smote = SMOTE(sampling_strategy="not majority")
-do_smote = True
+do_smote = False
 
 
 def clean_sample(arr):
@@ -200,7 +200,7 @@ def neural_network_classifier(X_train, X_test, Y_train, Y_test, X_val, Y_val):
     model.add(Dense(6, activation='tanh'))
     model.add(Dropout(0.8))
     model.add(Dense(4, activation='softmax'))
-    optimizer = Adam(lr=1e-6)
+    optimizer = Adam(lr=1e-3)
     # model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
     # optimizer = Adam(learning_rate=learning_rate)
     model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
@@ -270,7 +270,7 @@ def classify_by_gender():
     print("precision female:", precision_female_maj, "recall female:", recall_female_maj, "f1 female:", f1_female_maj)
     print("")
 
-    print("                        Random Class Classifier")
+    print("                        Baseline Class Classifier")
     print("                                Male")
     print("precision male:", precision_male_rand, "recall male:", recall_male_rand, "f1 male:", f1_male_rand)
     print("                               Female")
@@ -304,6 +304,10 @@ def classify_by_room():
     X_S1, Y_S1 = under_sample_majority_class(X_S1, Y_S1)
     X_S2, Y_S2 = under_sample_majority_class(X_S2, Y_S2)
 
+    # over sample minority classes without smote
+    X_S1, Y_S1 = over_sample_minority_classes(X_S1, Y_S1)
+    X_S2, Y_S2 = over_sample_minority_classes(X_S2, Y_S2)
+
     # apply smote
     if do_smote:
         X_S1, Y_S1 = apply_smote(X_S1, Y_S1)
@@ -332,14 +336,14 @@ def classify_by_room():
     print("precision:", precision_S2_maj, "recall:", recall_S2_maj, "f1:", f1_S2_maj)
     print("")
 
-    print("                        Random Class Classifier")
+    print("                        Baseline Class Classifier")
     print("                                S1")
     print("precision:", precision_S1_rand, "recall:", recall_S1_rand, "f1:", f1_S1_rand)
     print("                                S2")
     print("precision:", precision_S2_rand, "recall:", recall_S2_rand, "f1:", f1_S2_rand)
     print("")
 
-    print("               3-Layer Densely Connected Neural Network")
+    print("                  3-Layer Densely Connected Neural Network")
     print("                                S1")
     print("precision:", precision_S1_nn, "recall:", recall_S1_nn, "f1:", f1_S1_nn)
     print("                                S2")
@@ -381,11 +385,11 @@ def classify_as_one():
     print("precision:", precision_maj, "recall:", recall_maj, "f1:", f1_maj)
     print("")
 
-    print("                        Random Class Classifier")
+    print("                        Baseline Class Classifier")
     print("precision:", precision_rand, "recall:", recall_rand, "f1:", f1_rand)
     print("")
 
-    print("               3-Layer Densely Connected Neural Network")
+    print("                    3-Layer Densely Connected Neural Network")
     print("precision:", nn_precision, "recall:", nn_recall, "f1:", nn_f1)
 
     print("----------------------Both----------------------")
@@ -407,8 +411,6 @@ def classify_by_activity():
         X, Y = apply_smote(X, Y)
         unique, counts = np.unique(Y, return_counts=True)
         print("after smote class count:", np.column_stack((unique, counts)))
-
-    X, Y = over_sample_sit_class(X, Y)
 
     Y = np.where(Y == 2, 1, Y)
 
@@ -505,6 +507,39 @@ def apply_smote(x, y):
     return x_smote, y_smote
 
 
+def over_sample_minority_classes(x, y):
+    classes = np.bincount(y)
+    minority_class = np.argmin(classes)
+    second_minority_class = np.where(classes == np.partition(classes.flatten(), 1)[1])[0][0]
+    majority_class = np.argmax(classes)
+    amount_to_add_minority = classes[majority_class] - classes[minority_class]
+    amount_to_add_second_minority = classes[majority_class] - classes[second_minority_class]
+    y = y.reshape((y.shape[0], 1))
+    x = np.append(x, y, axis=1)
+
+    index_all_minority_label = np.array(np.where(x[:, 8] == minority_class)).flatten()
+    index_all_second_minority_label = np.array(np.where(x[:, 8] == second_minority_class)).flatten()
+
+    random_data_indices_minority = np.random.choice(index_all_minority_label, size=amount_to_add_minority)
+    random_data_indices_second_minority = np.random.choice(
+        index_all_second_minority_label, size=amount_to_add_second_minority)
+
+    for i in random_data_indices_minority:
+        row = np.array(x[i])
+        row = row.reshape((1, row.shape[0]))
+        x = np.append(x, row, axis=0)
+
+    for i in random_data_indices_second_minority:
+        row = np.array(x[i])
+        row = row.reshape((1, row.shape[0]))
+        x = np.append(x, row, axis=0)
+
+    x_out = np.array(x[:, 0:8])
+    y_out = np.array(x[:, 8]).astype(int)
+
+    return x_out, y_out
+
+
 def under_sample_majority_class(x, y):
     classes = np.bincount(y)
     majority_class = np.argmax(classes)
@@ -530,51 +565,8 @@ def under_sample_majority_class(x, y):
     return x_out, y_out
 
 
-def over_sample_sit_class(x, y):
-    classes = np.bincount(y)
-    total_sit = classes[1] + classes[2]
-    y = y.reshape((y.shape[0], 1))
-    x = np.append(x, y, axis=1)
-
-    index_all_sit_bed = np.array(np.where(x[:, 8] == 1))
-    index_all_sit_chair = np.array(np.where(x[:, 8] == 2))
-    index_all_sit_bed_samples = index_all_sit_bed.flatten()
-    index_all_sit_chair_samples = index_all_sit_chair.flatten()
-
-    random_data_indices_bed = np.random.choice(index_all_sit_bed_samples, size=int(total_sit/2))
-    random_data_indices_chair = np.random.choice(index_all_sit_chair_samples, size=int(total_sit/2))
-    # random_data_indices_bed = np.random.choice(index_all_sit_bed_samples, size=total_sit)
-
-    for i in range(len(random_data_indices_bed)):
-        bed_row = np.array(x[random_data_indices_bed[i]])
-        chair_row = np.array(x[random_data_indices_chair[i]])
-        bed_row = bed_row.reshape((1, bed_row.shape[0]))
-        chair_row = chair_row.reshape((1, chair_row.shape[0]))
-        x = np.append(x, bed_row, axis=0)
-        x = np.append(x, chair_row, axis=0)
-
-    x_out = x[:, 0:8]
-    y_out = x[:, 8]
-
-    return np.array(x_out), np.array(y_out).astype(int)
-
-
 if __name__ == "__main__":
     # classify_by_gender()
-    # classify_by_room()
+    classify_by_room()
     # classify_as_one()
     # classify_by_activity()
-
-    X_S1, X_S2, Y_S1, Y_S2 = load_data_gender()
-
-    X_S1, Y_S1 = under_sample_majority_class(X_S1, Y_S1)
-    X_S2, Y_S2 = under_sample_majority_class(X_S2, Y_S2)
-
-    print("classes S1:", np.bincount(Y_S1))
-    print("classes S2:", np.bincount(Y_S2))
-
-    X_S1, Y_S1 = apply_smote(X_S1, Y_S1)
-    X_S2, Y_S2 = apply_smote(X_S2, Y_S2)
-
-    print("classes S1:", np.bincount(Y_S1))
-    print("classes S2:", np.bincount(Y_S2))
