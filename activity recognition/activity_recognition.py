@@ -263,13 +263,13 @@ def classify_by_gender():
     precision_female_rand, recall_female_rand, f1_female_rand = simple_baseline_classifier(
         X_female_train, X_female_test, Y_female_train, Y_female_test)
 
-    X_male, Y_male = under_sample_majority_class(X_male, Y_male)
-    X_female, Y_female = under_sample_majority_class(X_female, Y_female)
-
-    # apply smote
+    # balance dataset by smote or repeat minority class sample
     if do_smote:
         X_male, Y_male = apply_smote(X_male, Y_male)
         X_female, Y_female = apply_smote(X_female, Y_female)
+    else:
+        X_male, Y_male = under_sample_majority_class(X_male, Y_male)
+        X_female, Y_female = under_sample_majority_class(X_female, Y_female)
 
     Y_male_encoded = to_categorical(Y_male)
     Y_female_encoded = to_categorical(Y_female)
@@ -280,10 +280,10 @@ def classify_by_gender():
     X_male_train, X_male_val, Y_male_train, Y_male_val = train_test_split(X_male_train, Y_male_train, test_size=0.2)
     X_female_train, X_female_val, Y_female_train, Y_female_val = train_test_split(X_female_train, Y_female_train, test_size=0.2)
 
-    precision_male, recall_male, f1_male = neural_network_classifier(
+    precision_male, recall_male, f1_male, learning_rate_male, all_learning_rates_male = neural_network_classifier(
         X_male_train, X_male_test, Y_male_train, Y_male_test, X_male_val, Y_male_val
     )
-    precision_female, recall_female, f1_female = neural_network_classifier(
+    precision_female, recall_female, f1_female, learning_rate_female, all_learning_rates_female = neural_network_classifier(
         X_female_train, X_female_test, Y_female_train, Y_female_test, X_female_val, Y_female_val
     )
 
@@ -304,8 +304,10 @@ def classify_by_gender():
     print("               3-Layer Densely Connected Neural Network")
     print("                                Male")
     print("precision male:", precision_male, "recall male:", recall_male, "f1 male:", f1_male)
+    print("optimal learning rate:", learning_rate_male, "learning rate updates:", all_learning_rates_male)
     print("                                Female")
     print("precision female:", precision_female, "recall female:", recall_female, "f1 female:", f1_female)
+    print("optimal learning rate:", learning_rate_female, "learning rate updates:", all_learning_rates_female)
 
     print("----------------------Gender----------------------")
 
@@ -328,14 +330,13 @@ def classify_by_room():
     X_S1, Y_S1 = under_sample_majority_class(X_S1, Y_S1)
     X_S2, Y_S2 = under_sample_majority_class(X_S2, Y_S2)
 
-    # over sample minority classes without smote
-    X_S1, Y_S1 = over_sample_minority_classes(X_S1, Y_S1)
-    X_S2, Y_S2 = over_sample_minority_classes(X_S2, Y_S2)
-
-    # apply smote
+    # balance dataset by smote or repeat minority class sample
     if do_smote:
         X_S1, Y_S1 = apply_smote(X_S1, Y_S1)
         X_S2, Y_S2 = apply_smote(X_S2, Y_S2)
+    else:
+        X_S1, Y_S1 = over_sample_minority_classes(X_S1, Y_S1)
+        X_S2, Y_S2 = over_sample_minority_classes(X_S2, Y_S2)
 
     Y_S1_encoded = to_categorical(Y_S1)
     Y_S2_encoded = to_categorical(Y_S2)
@@ -346,10 +347,10 @@ def classify_by_room():
     X_S2_train, X_S2_test, Y_S2_train, Y_S2_test = train_test_split(X_S2, Y_S2_encoded, test_size=0.2)
     X_S2_train, X_S2_val, Y_S2_train, Y_S2_val = train_test_split(X_S2_train, Y_S2_train, test_size=0.2)
 
-    precision_S1_nn, recall_S1_nn, f1_S1_nn = neural_network_classifier(
+    precision_S1_nn, recall_S1_nn, f1_S1_nn, learning_rate_S1, all_learning_rates_S1 = neural_network_classifier(
         X_S1_train, X_S1_test, Y_S1_train, Y_S1_test, X_S1_val, Y_S1_val
     )
-    precision_S2_nn, recall_S2_nn, f1_S2_nn = neural_network_classifier(
+    precision_S2_nn, recall_S2_nn, f1_S2_nn, learning_rate_S2, all_learning_rates_S2 = neural_network_classifier(
         X_S2_train, X_S2_test, Y_S2_train, Y_S2_test, X_S2_val, Y_S2_val
     )
 
@@ -370,8 +371,11 @@ def classify_by_room():
     print("                  3-Layer Densely Connected Neural Network")
     print("                                S1")
     print("precision:", precision_S1_nn, "recall:", recall_S1_nn, "f1:", f1_S1_nn)
+    print("")
+    print("optimal learning rate:", learning_rate_S1, "learning rate updates:", all_learning_rates_S2)
     print("                                S2")
     print("precision:", precision_S2_nn, "recall:", recall_S2_nn, "f1:", f1_S2_nn)
+    print("optimal learning rate:", learning_rate_S2, "learning rate updates:", all_learning_rates_S2)
 
     print("----------------------Room-----------------------")
 
@@ -392,12 +396,11 @@ def classify_as_one():
     # under sample majority class
     X, Y = under_sample_majority_class(X, Y)
 
-    # over sample minority classes
-    X, Y = over_sample_minority_classes(X, Y)
-
-    # apply smote
+    # balance dataset by smote or repeat minority class sample
     if do_smote:
         X, Y = apply_smote(X, Y)
+    else:
+        X, Y = over_sample_minority_classes(X, Y)
 
     Y_encoded = to_categorical(Y)
 
@@ -418,7 +421,6 @@ def classify_as_one():
 
     print("                    3-Layer Densely Connected Neural Network")
     print("precision:", nn_precision, "recall:", nn_recall, "f1:", nn_f1)
-    print("")
     print("optimal learning rate:", learning_rate, "learning rate updates:", all_learning_rates)
 
     print("----------------------Both----------------------")
@@ -433,15 +435,22 @@ def classify_by_activity():
     unique, counts = np.unique(Y, return_counts=True)
     print("before class count:", np.column_stack((unique, counts)))
 
+    X, Y = under_sample_majority_class(X, Y)
+
+    print("after under sample:", np.bincount(Y))
+
     if do_smote:
         X, Y = apply_smote(X, Y)
         unique, counts = np.unique(Y, return_counts=True)
         print("after smote class count:", np.column_stack((unique, counts)))
+    else:
+        X, Y = over_sample_minority_classes(X, Y)
+        print("after over sample class count:", np.bincount(Y))
 
-    Y = np.where(Y == 2, 1, Y)
+    Y = np.where(Y == 1, 0, Y)
 
     unique, counts = np.unique(Y, return_counts=True)
-    print("after over sample class count:", np.column_stack((unique, counts)))
+    print("after sit label change:", np.column_stack((unique, counts)))
 
     Y_encoded = to_categorical(Y)
 
@@ -449,11 +458,11 @@ def classify_by_activity():
     X_train, X_val, Y_train, Y_val = train_test_split(X_train, Y_train, test_size=0.2)
 
     model = Sequential()
-    model.add(Dense(25, input_shape=(8,), activation='gelu'))
+    model.add(Dense(8, input_shape=(8,), activation='gelu'))
     model.add(Dropout(0.8))
-    model.add(Dense(10, activation='tanh'))
+    model.add(Dense(6, activation='tanh'))
     model.add(Dropout(0.8))
-    model.add(Dense(5, activation='softmax'))
+    model.add(Dense(4, activation='softmax'))
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
     model.fit(X_train, Y_train, validation_data=(X_val, Y_val), epochs=100, batch_size=75000)
@@ -501,7 +510,7 @@ def classify_by_activity():
         sit_model.add(Dropout(0.8))
         sit_model.add(Dense(10, activation='tanh'))
         sit_model.add(Dropout(0.8))
-        sit_model.add(Dense(3, activation='softmax'))
+        sit_model.add(Dense(2, activation='softmax'))
         sit_model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
         sit_model.summary()
@@ -592,7 +601,7 @@ def under_sample_majority_class(x, y):
 
 
 if __name__ == "__main__":
-    # classify_by_gender()
+    classify_by_gender()
     # classify_by_room()
-    classify_as_one()
+    # classify_as_one()
     # classify_by_activity()
