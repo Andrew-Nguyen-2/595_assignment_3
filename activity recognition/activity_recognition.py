@@ -9,12 +9,15 @@ from tensorflow.python.keras import Sequential
 from tensorflow.python.keras.layers import Dense, Dropout
 from tensorflow.python.keras.optimizer_v2.adam import Adam
 from tensorflow.python.keras.utils.np_utils import to_categorical
+from tensorflow_addons.metrics import F1Score
+from scipy import stats
 
 evaluation_metric = 'micro'
 smote = SMOTE(sampling_strategy="not majority")
 do_smote = True
 epoch = 100
 batch_size = 75000
+loss = 'categorical_crossentropy'
 test_size = 0.2
 
 
@@ -23,7 +26,7 @@ def clean_sample(arr):
 
     for i in arr:
         for j in i:
-            out.append(j-1)
+            out.append(j - 1)
 
     return out
 
@@ -195,11 +198,8 @@ def simple_baseline_classifier(X_train, X_test, Y_train, Y_test):
 
 def train_learning_rate(x_train, x_test, y_train, y_test, x_val, y_val, output_length):
     learning_rate = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
-    updated_learning_rates = []
     learning_rate_out = 0
-    loss = float("inf")
-    precision = float("-inf")
-    recall = float("-inf")
+    f1 = float("-inf")
     for lr in learning_rate:
         model = Sequential()
         model.add(Dense(8, input_shape=(8,), activation='gelu'))
@@ -208,24 +208,18 @@ def train_learning_rate(x_train, x_test, y_train, y_test, x_val, y_val, output_l
         model.add(Dropout(0.8))
         model.add(Dense(output_length, activation='softmax'))
         optimizer = Adam(learning_rate=lr)
-        model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy', 'Precision', 'Recall'])
+        model.compile(optimizer=optimizer, loss=loss, metrics=[F1Score(num_classes=output_length)])
         history = model.fit(x_train, y_train, validation_data=(x_val, y_val), epochs=epoch, batch_size=batch_size)
-        tmp_loss = min(history.history['val_loss'])
-        tmp_precision = max(history.history['val_precision'])
-        tmp_recall = max(history.history['val_recall'])
-        if tmp_loss < loss or (tmp_precision > precision and tmp_recall > recall):
-            loss = tmp_loss
-            precision = tmp_precision
-            recall = tmp_recall
+        tmp_f1 = max(history.history['val_f1_score'])
+        if tmp_f1 > f1:
+            f1 = tmp_f1
             learning_rate_out = lr
-            updated_learning_rates.append(lr)
 
-    return learning_rate_out, updated_learning_rates
+    return learning_rate_out
 
 
 def neural_network_classifier(X_train, X_test, Y_train, Y_test, X_val, Y_val, output_length):
-    learning_rate, all_learning_rates = train_learning_rate(
-        X_train, X_test, Y_train, Y_test, X_val, Y_val, output_length)
+    learning_rate = train_learning_rate(X_train, X_test, Y_train, Y_test, X_val, Y_val, output_length)
 
     model = Sequential()
     model.add(Dense(8, input_shape=(8,), activation='gelu'))
@@ -234,7 +228,7 @@ def neural_network_classifier(X_train, X_test, Y_train, Y_test, X_val, Y_val, ou
     model.add(Dropout(0.8))
     model.add(Dense(output_length, activation='softmax'))
     optimizer = Adam(learning_rate=learning_rate)
-    model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=optimizer, loss=loss, metrics=['accuracy'])
 
     model.summary()
 
@@ -250,17 +244,17 @@ def neural_network_classifier(X_train, X_test, Y_train, Y_test, X_val, Y_val, ou
     recall = recall_score(Y_test_one_label, predictions, average=evaluation_metric, zero_division=1)
     f1 = f1_score(Y_test_one_label, predictions, average=evaluation_metric, zero_division=1)
 
-    return precision, recall, f1, learning_rate, all_learning_rates
+    return precision, recall, f1
 
 
 def classify_by_gender():
-
     print("----------------------Gender----------------------")
 
     X_male, X_female, Y_male, Y_female = load_data_gender()
 
     X_male_train, X_male_test, Y_male_train, Y_male_test = train_test_split(X_male, Y_male, test_size=test_size)
-    X_female_train, X_female_test, Y_female_train, Y_female_test = train_test_split(X_female, Y_female, test_size=test_size)
+    X_female_train, X_female_test, Y_female_train, Y_female_test = train_test_split(X_female, Y_female,
+                                                                                    test_size=test_size)
 
     precision_male_maj, recall_male_maj, f1_male_maj = majority_class_classifier(Y_male_train, Y_male_test)
     precision_female_maj, recall_female_maj, f1_female_maj = majority_class_classifier(Y_female_train, Y_female_test)
@@ -294,12 +288,11 @@ def classify_by_gender():
     class_count_male = len(np.unique(Y_male))
     class_count_female = len(np.unique(Y_female))
 
-    precision_male, recall_male, f1_male, learning_rate_male, all_learning_rates_male = neural_network_classifier(
+    precision_male, recall_male, f1_male = neural_network_classifier(
         X_male_train, X_male_test, Y_male_train, Y_male_test, X_male_val, Y_male_val, class_count_male
     )
-    precision_female, recall_female, f1_female, learning_rate_female, all_learning_rates_female = \
-        neural_network_classifier(X_female_train, X_female_test, Y_female_train,
-                                  Y_female_test, X_female_val, Y_female_val, class_count_female
+    precision_female, recall_female, f1_female = neural_network_classifier(
+        X_female_train, X_female_test, Y_female_train, Y_female_test, X_female_val, Y_female_val, class_count_female
     )
 
     print("                      Majority Class Classifier")
@@ -313,16 +306,15 @@ def classify_by_gender():
     print("                                Male")
     print("precision male:", precision_male_rand, "recall male:", recall_male_rand, "f1 male:", f1_male_rand)
     print("                               Female")
-    print("precision female:", precision_female_rand, "recall female:", recall_female_rand, "f1 female:", f1_female_rand)
+    print("precision female:", precision_female_rand, "recall female:", recall_female_rand, "f1 female:",
+          f1_female_rand)
     print("")
 
     print("               3-Layer Densely Connected Neural Network")
     print("                                Male")
     print("precision male:", precision_male, "recall male:", recall_male, "f1 male:", f1_male)
-    print("optimal learning rate:", learning_rate_male, "learning rate updates:", all_learning_rates_male)
     print("                                Female")
     print("precision female:", precision_female, "recall female:", recall_female, "f1 female:", f1_female)
-    print("optimal learning rate:", learning_rate_female, "learning rate updates:", all_learning_rates_female)
 
     print("----------------------Gender----------------------")
 
@@ -365,10 +357,10 @@ def classify_by_room():
     class_count_S1 = len(np.unique(Y_S1))
     class_count_S2 = len(np.unique(Y_S2))
 
-    precision_S1_nn, recall_S1_nn, f1_S1_nn, learning_rate_S1, all_learning_rates_S1 = neural_network_classifier(
+    precision_S1_nn, recall_S1_nn, f1_S1_nn = neural_network_classifier(
         X_S1_train, X_S1_test, Y_S1_train, Y_S1_test, X_S1_val, Y_S1_val, class_count_S1
     )
-    precision_S2_nn, recall_S2_nn, f1_S2_nn, learning_rate_S2, all_learning_rates_S2 = neural_network_classifier(
+    precision_S2_nn, recall_S2_nn, f1_S2_nn = neural_network_classifier(
         X_S2_train, X_S2_test, Y_S2_train, Y_S2_test, X_S2_val, Y_S2_val, class_count_S2
     )
 
@@ -389,10 +381,8 @@ def classify_by_room():
     print("                  3-Layer Densely Connected Neural Network")
     print("                                S1")
     print("precision:", precision_S1_nn, "recall:", recall_S1_nn, "f1:", f1_S1_nn)
-    print("optimal learning rate:", learning_rate_S1, "learning rate updates:", all_learning_rates_S2)
     print("                                S2")
     print("precision:", precision_S2_nn, "recall:", recall_S2_nn, "f1:", f1_S2_nn)
-    print("optimal learning rate:", learning_rate_S2, "learning rate updates:", all_learning_rates_S2)
 
     print("----------------------Room-----------------------")
 
@@ -426,8 +416,8 @@ def classify_as_one():
 
     class_count = len(np.unique(Y))
 
-    nn_precision, nn_recall, nn_f1, learning_rate, all_learning_rates = neural_network_classifier(
-        X_train, X_test, Y_train, Y_test, X_val, Y_val, class_count)
+    nn_precision, nn_recall, nn_f1 = neural_network_classifier(X_train, X_test, Y_train,
+                                                               Y_test, X_val, Y_val, class_count)
 
     print("                      Majority Class Classifier")
     print("precision:", precision_maj, "recall:", recall_maj, "f1:", f1_maj)
@@ -439,7 +429,6 @@ def classify_as_one():
 
     print("                    3-Layer Densely Connected Neural Network")
     print("precision:", nn_precision, "recall:", nn_recall, "f1:", nn_f1)
-    print("optimal learning rate:", learning_rate, "learning rate updates:", all_learning_rates)
 
     print("----------------------Both----------------------")
 
@@ -459,8 +448,6 @@ def classify_by_activity():
     # should equal 4
     class_count = len(np.unique(Y))
 
-    Y = np.where(Y == 1, 0, Y)
-
     X, Y = under_sample_majority_class(X, Y)
 
     if do_smote:
@@ -468,13 +455,14 @@ def classify_by_activity():
     else:
         X, Y = over_sample_minority_classes(X, Y)
 
+    Y = np.where(Y == 1, 0, Y)
+
     Y_encoded = to_categorical(Y)
 
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y_encoded, test_size=test_size)
     X_train, X_val, Y_train, Y_val = train_test_split(X_train, Y_train, test_size=test_size)
 
-    learning_rate, all_learning_rates = train_learning_rate(
-        X_train, X_test, Y_train, Y_test, X_val, Y_val, class_count)
+    learning_rate = train_learning_rate(X_train, X_test, Y_train, Y_test, X_val, Y_val, class_count)
 
     model = Sequential()
     model.add(Dense(8, input_shape=(8,), activation='gelu'))
@@ -483,9 +471,7 @@ def classify_by_activity():
     model.add(Dropout(0.8))
     model.add(Dense(class_count, activation='softmax'))
     optimizer = Adam(learning_rate=learning_rate)
-    model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
-
-    print("optimal learning rate:", learning_rate, "learning rate updates:", all_learning_rates)
+    model.compile(optimizer=optimizer, loss=loss, metrics=['accuracy'])
 
     model.fit(X_train, Y_train, validation_data=(X_val, Y_val), epochs=epoch, batch_size=batch_size)
     y_pred = model.predict(X_test)
@@ -498,7 +484,7 @@ def classify_by_activity():
     # check what class and if sitting then determine what they are sitting on
     # find all samples that are predicted to be 1 or 2
     X_pred_sit = np.zeros((1, 8))
-    Y_pred_sit = np.zeros((1, ))
+    Y_pred_sit = np.zeros((1,))
     sit_pred_indices = []
 
     for i in range(len(predictions)):
@@ -521,8 +507,8 @@ def classify_by_activity():
     # should equal 2
     class_count_sit = len(np.unique(Y_sit))
 
-    learning_rate, all_learning_rates = train_learning_rate(
-        X_sit_train, X_sit_test, Y_sit_train, Y_sit_test, X_sit_val, Y_sit_val, class_count_sit)
+    learning_rate = train_learning_rate(X_sit_train, X_sit_test, Y_sit_train, Y_sit_test,
+                                        X_sit_val, Y_sit_val, class_count_sit)
 
     if not np.all(X_pred_sit == 0):
         sit_model = Sequential()
@@ -532,7 +518,7 @@ def classify_by_activity():
         sit_model.add(Dropout(0.8))
         sit_model.add(Dense(class_count_sit, activation='softmax'))
         optimizer = Adam(learning_rate=learning_rate)
-        sit_model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
+        sit_model.compile(optimizer=optimizer, loss=loss, metrics=['accuracy'])
 
         sit_model.summary()
 
@@ -548,7 +534,7 @@ def classify_by_activity():
 
     precision = precision_score(Y_test_one_label, predictions, average=evaluation_metric, zero_division=1)
     recall = recall_score(Y_test_one_label, predictions, average=evaluation_metric, zero_division=1)
-    f1 = f1_score(Y_test_one_label, predictions, average=evaluation_metric, zero_division=1)
+    f1_nn = f1_score(Y_test_one_label, predictions, average=evaluation_metric, zero_division=1)
 
     print("                      Majority Class Classifier")
     print("precision:", precision_maj, "recall:", recall_maj, "f1:", f1_maj)
@@ -559,10 +545,12 @@ def classify_by_activity():
     print("")
 
     print("                    3-Layer Densely Connected Neural Network")
-    print("precision:", precision, "recall:", recall, "f1:", f1)
-    print("optimal learning rate:", learning_rate, "learning rate updates:", all_learning_rates)
+    print("precision:", precision, "recall:", recall, "f1:", f1_nn)
+    print("optimal learning rate:", learning_rate)
 
     print("----------------------Activity----------------------")
+
+    # return f1_maj, f1_avg, f1_nn
 
 
 def apply_smote(x, y):
@@ -632,5 +620,27 @@ def under_sample_majority_class(x, y):
 if __name__ == "__main__":
     # classify_by_gender()
     # classify_by_room()
-    # classify_as_one()
-    classify_by_activity()
+    classify_as_one()
+    # classify_by_activity()
+
+    # t test and p value calculation for activity
+    # to run, uncomment code below and in line 553
+    # f1_maj = []
+    # f1_male_rand = []
+    # f1_male_nn = []
+    #
+    # for i in range(10):
+    #     f1_maj, f1_rand, f1_nn = classify_by_activity()
+    #     f1_maj.append(f1_maj)
+    #     f1_rand.append(f1_rand)
+    #     f1_nn.append(f1_nn)
+    #
+    # print("majority vs. baseline")
+    # t, p = stats.ttest_rel(f1_maj, f1_rand)
+    # print("t:", t, "p:", p)
+    # print("majority vs. neural network")
+    # t, p = stats.ttest_rel(f1_maj, f1_nn)
+    # print("t:", t, "p:", p)
+    # print("baseline vs. neural network")
+    # t, p = stats.ttest_rel(f1_rand, f1_nn)
+    # print("t:", t, "p:", p)
